@@ -1,0 +1,192 @@
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User, UserRole, UserStatus } from './entities/user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+  ) {}
+
+  async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
+    const existingUser = await this.usersRepository.findOne({
+      where: { email: createUserDto.email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    if (createUserDto.role && createUserDto.role !== UserRole.USER) {
+      if (!currentUser || !currentUser.isAdmin()) {
+        throw new ForbiddenException('Only admins can create users with custom roles');
+      }
+    }
+
+    const user = this.usersRepository.create(createUserDto);
+    
+    if (!user.status) {
+      user.status = UserStatus.PENDING;
+    }
+
+    return await this.usersRepository.save(user);
+  }
+
+  async findAll(
+    filters?: {
+      status?: UserStatus;
+      role?: UserRole;
+      search?: string;
+    },
+    currentUser?: User,
+  ): Promise<User[]> {
+    const query = this.usersRepository.createQueryBuilder('user');
+
+    if (filters?.status) {
+      query.andWhere('user.status = :status', { status: filters.status });
+    }
+
+    if (filters?.role) {
+      query.andWhere('user.role = :role', { role: filters.role });
+    }
+
+    if (filters?.search) {
+      query.andWhere(
+        '(user.email ILIKE :search OR user.firstName ILIKE :search OR user.lastName ILIKE :search)',
+        { search: `%${filters.search}%` },
+      );
+    }
+
+    if (!currentUser?.isAdmin()) {
+      query.andWhere('user.status = :activeStatus', { activeStatus: UserStatus.ACTIVE });
+    }
+
+    return await query.orderBy('user.createdAt', 'DESC').getMany();
+  }
+
+  async findOne(id: string, currentUser?: User): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    if (!user.isActive() && !currentUser?.isAdmin()) {
+      throw new ForbiddenException('Cannot view this user');
+    }
+
+    return user;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return await this.usersRepository.findOne({
+      where: { email },
+      select: ['id', 'email', 'password', 'role', 'status', 'firstName', 'lastName'],
+    });
+  }
+
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+    currentUser?: User,
+  ): Promise<User> {
+    const user = await this.findOne(id, currentUser);
+
+    if (currentUser?.id !== id && !currentUser?.isAdmin()) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+
+    if (updateUserDto.role && !currentUser?.isAdmin()) {
+      throw new ForbiddenException('Only admins can change user roles');
+    }
+
+    if (updateUserDto.status && !currentUser?.isAdmin()) {
+      throw new ForbiddenException('Only admins can change user status');
+    }
+
+    Object.assign(user, updateUserDto);
+    return await this.usersRepository.save(user);
+  }
+
+  async remove(id: string, currentUser?: User): Promise<void> {
+    const user = await this.findOne(id, currentUser);
+
+    if (!currentUser?.isAdmin()) {
+      throw new ForbiddenException('Only admins can delete users');
+    }
+
+    if (currentUser.id === id) {
+      throw new BadRequestException('Cannot delete your own account');
+    }
+
+    await this.usersRepository.remove(user);
+  }
+
+  async activateUser(id: string, currentUser: User): Promise<User> {
+    if (!currentUser.isAdmin()) {
+      throw new ForbiddenException('Only admins can activate users');
+    }
+
+    const user = await this.findOne(id);
+    user.status = UserStatus.ACTIVE;
+    return await this.usersRepository.save(user);
+  }
+
+  async suspendUser(id: string, currentUser: User): Promise<User> {
+    if (!currentUser.isAdmin()) {
+      throw new ForbiddenException('Only admins can suspend users');
+    }
+
+    const user = await this.findOne(id);
+    user.status = UserStatus.SUSPENDED;
+    return await this.usersRepository.save(user);
+  }
+
+  async getStats(currentUser?: User) {
+    const isAdmin = currentUser?.isAdmin();
+
+    const query = this.usersRepository.createQueryBuilder('user');
+    
+    if (!isAdmin) {
+      query.where('user.status = :status', { status: UserStatus.ACTIVE });
+    }
+
+    const [total, active, pending, suspended] = await Promise.all([
+      query.getCount(),
+      this.usersRepository.count({ where: { status: UserStatus.ACTIVE } }),
+      this.usersRepository.count({ where: { status: UserStatus.PENDING } }),
+      this.usersRepository.count({ where: { status: UserStatus.SUSPENDED } }),
+    ]);
+
+    const roles = await this.usersRepository
+      .createQueryBuilder('user')
+      .select('user.role, COUNT(*) as count')
+      .groupBy('user.role')
+      .getRawMany();
+
+    return {
+      total,
+      active,
+      pending,
+      suspended,
+      roles,
+      canViewAll: isAdmin,
+    };
+  }
+
+  async updateLastLogin(id: string): Promise<void> {
+    await this.usersRepository.update(id, {
+      lastLoginAt: new Date(),
+    });
+  }
+}

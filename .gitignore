@@ -1,0 +1,238 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnpm-store/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+.secrets
+.secret.local
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.code-workspace
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+._*
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Database
+*.sqlite
+*.sqlite3
+/dbdata/
+/database/backups/
+
+# Docker
+docker-compose.override.yml
+!docker-compose.yml
+!Dockerfile
+
+# TypeScript cache
+*.tsbuildinfo
+
+# NestJS specific
+nest-cli.json
+.nest/
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Temporary files
+tmp/
+temp/
+.temp/
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Coverage directory used by tools like istanbul
+.coverage/
+.coveralls.yml
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains IDEs
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Optional REPL history
+.node_repl_history
+
+# Optional stylelint cache
+.stylelintcache
+
+# Optional Mac metadata
+._*
+
+# Optional Windows thumbnail cache
+Thumbs.db
+
+# Optional lock file
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release/
+
+# Production env files (keep example files)
+!.env.example
+!.env.development.example
+!.env.test.example
+!.env.production.example
+
+# Documentation
+/docs/_build/
+
+# SonarQube
+.scannerwork/
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Turbo
+.turbo/
+
+# TypeORM
+ormconfig.json
+ormconfig.js
+ormconfig.ts
+
+# Migration files (keep only source, not compiled)
+src/migrations/*.ts
+!src/migrations/*.js
+
+# Seed files
+src/seeds/*.ts
+!src/seeds/*.js
+
+# Local development certificates
+certs/
+ssl/
+
+# Uploads directory (user uploaded files)
+uploads/
+public/uploads/
+
+# Temporary uploads
+tmp_uploads/
+
+# Mail templates cache
+.mail-templates-cache/
+
+# AI/ML models cache
+.models/
+.cache/
+
+# VS Code Dev Containers
+.devcontainer/
+
+# Gitpod
+.gitpod.yml
+
+# Codespaces
+.codespaces/
+
+# GitHub Codespaces
+.codespace/
+
+# Local development scripts
+scripts/local/
+!scripts/deploy/
+!scripts/ci/
+
+# Benchmark results
+benchmarks/results/
+
+# Performance profiling
+profiles/
+*.cpuprofile
+*.heapsnapshot
+
+# Custom application data
+data/
+!data/schema/
+!data/seeds/
+
+# Cache directories
+.cache/
+.next/
+.nuxt/
+
+# Trash
+.trash-*/
