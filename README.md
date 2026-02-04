@@ -430,7 +430,9 @@ Este proyecto está bajo la Licencia MIT. Ver LICENSE para más detalles.
 ## 👨‍💻 Autor
 
 Maximiliano Romero
+
 [maximilianoromerovigo@gmail.com]
+
 https://github.com/MaximilianoFRomero
 
 # ⭐️ ¿Te gusta este proyecto? ¡Dale una estrella en GitHub y compártelo!
