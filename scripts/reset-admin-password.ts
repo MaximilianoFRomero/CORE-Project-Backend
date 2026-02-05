@@ -1,4 +1,3 @@
-// backend/scripts/reset-admin-password.ts
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../src/modules/users/entities/user.entity';
@@ -21,7 +20,6 @@ async function resetAdminPassword() {
   
   const userRepo = dataSource.getRepository(User);
   
-  // Encontrar usuario
   const admin = await userRepo.findOne({
     where: { email: 'superadmin@coreplatform.dev' }
   });
@@ -34,15 +32,12 @@ async function resetAdminPassword() {
   console.log('🔧 Admin encontrado:', admin.email);
   console.log('🔧 Hash actual:', admin.password?.substring(0, 30) + '...');
   
-  // Resetear password
-  const newPassword = 'Admin123!'; // Más simple
+  const newPassword = 'Admin123!';
   console.log('🔧 Nueva contraseña:', newPassword);
   
-  // Actualizar usando el hook de la entidad
   admin.password = newPassword;
   await userRepo.save(admin);
   
-  // Verificar
   const updatedAdmin = await userRepo
     .createQueryBuilder('user')
     .addSelect('user.password')
@@ -56,7 +51,6 @@ async function resetAdminPassword() {
   console.log('✅ Contraseña reseteada');
   console.log('🔧 Nuevo hash:', updatedAdmin.password.substring(0, 30) + '...');
   
-  // Probar bcrypt
   const isValid = await bcrypt.compare(newPassword, updatedAdmin.password);
   console.log('🔧 ¿Nueva contraseña válida?:', isValid);
   

@@ -1,4 +1,3 @@
-// Este archivo debería ser una estrategia Passport, no otro RolesGuard
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';

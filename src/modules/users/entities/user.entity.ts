@@ -76,7 +76,6 @@ export class User {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // Métodos para contraseñas
   @BeforeInsert()
   @BeforeUpdate()
   async hashPassword() {
@@ -90,7 +89,6 @@ export class User {
     return bcrypt.compare(password, this.password);
   }
 
-  // Helper methods
   get fullName(): string {
     return `${this.firstName} ${this.lastName}`;
   }

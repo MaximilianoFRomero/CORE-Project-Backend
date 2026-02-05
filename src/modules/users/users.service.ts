@@ -18,7 +18,12 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
-async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
+async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
+  console.log('=== USERS SERVICE CREATE ===');
+  console.log('Current user:', currentUser);
+  console.log('Current user role:', currentUser?.role);
+  console.log('Requested role:', createUserDto.role);
+
   const existingUser = await this.usersRepository.findOne({
     where: { email: createUserDto.email },
   });
@@ -27,17 +32,17 @@ async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
     throw new ConflictException('Email already exists');
   }
 
-  // Validar permisos para crear usuarios con roles elevados
   if (createUserDto.role && createUserDto.role !== UserRole.USER) {
     if (!currentUser) {
       throw new ForbiddenException('Authentication required to create users with custom roles');
     }
     
-    if (createUserDto.role === UserRole.SUPER_ADMIN && !currentUser.isSuperAdmin()) {
+    if (createUserDto.role === UserRole.SUPER_ADMIN && currentUser.role !== UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Only Super Admins can create other Super Admins');
     }
     
-    if (!currentUser.isAdmin()) {
+    const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN;
+    if (!isAdmin) {
       throw new ForbiddenException('Only admins can create users with custom roles');
     }
   }
@@ -106,7 +111,7 @@ async findByEmail(email: string): Promise<User | null> {
   
   const user = await this.usersRepository
     .createQueryBuilder('user')
-    .addSelect('user.password') // ← IMPORTANTE: Incluir password
+    .addSelect('user.password')
     .where('user.email = :email', { email })
     .getOne();
   
@@ -216,4 +221,14 @@ async findByEmail(email: string): Promise<User | null> {
   }
 
 
+}
+
+export function hasAdminRole(user: any): boolean {
+  if (!user || !user.role) return false;
+  return user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+}
+
+export function hasSuperAdminRole(user: any): boolean {
+  if (!user || !user.role) return false;
+  return user.role === UserRole.SUPER_ADMIN;
 }

@@ -109,14 +109,12 @@ async validateUser(email: string, password: string): Promise<any> {
   }
 
   async register(createUserDto: any) {
-    // Verificar si el usuario ya existe
     const existingUser = await this.usersService.findByEmail(createUserDto.email);
     
     if (existingUser) {
       throw new BadRequestException('Email already exists');
     }
 
-    // Crear usuario con status PENDING
     const user = await this.usersService.create({
       ...createUserDto,
       status: UserStatus.PENDING,

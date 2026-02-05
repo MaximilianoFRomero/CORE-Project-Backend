@@ -1,4 +1,3 @@
-// backend/scripts/init-super-admin.ts - VERSIÓN CORREGIDA
 import { DataSource } from 'typeorm';
 import { User, UserRole, UserStatus } from '../src/modules/users/entities/user.entity';
 
@@ -22,7 +21,6 @@ async function initializeSuperAdmin() {
     
     const userRepository = dataSource.getRepository(User);
     
-    // Verificar si ya existe Super Admin
     const existingSuperAdmin = await userRepository.findOne({
       where: { role: UserRole.SUPER_ADMIN }
     });
@@ -33,7 +31,6 @@ async function initializeSuperAdmin() {
       console.log('   Role:', existingSuperAdmin.role);
       console.log('   Status:', existingSuperAdmin.status);
       
-      // Mostrar password para debugging
       const result = await dataSource.query(
         'SELECT password FROM users WHERE id = $1',
         [existingSuperAdmin.id]
@@ -42,7 +39,6 @@ async function initializeSuperAdmin() {
       return;
     }
     
-    // Configuración del Super Admin
     const superAdminConfig = {
       email: process.env.SUPER_ADMIN_EMAIL || 'superadmin@coreplatform.dev',
       firstName: process.env.SUPER_ADMIN_FIRST_NAME || 'System',
@@ -56,12 +52,11 @@ async function initializeSuperAdmin() {
     console.log('📝 Configurando Super Admin:', superAdminConfig.email);
     console.log('📝 Password plaintext:', superAdminConfig.password);
     
-    // Crear Super Admin - DEJAR QUE EL HOOK HASH PASSWORD LO HAGA
     const superAdmin = userRepository.create({
       email: superAdminConfig.email,
       firstName: superAdminConfig.firstName,
       lastName: superAdminConfig.lastName,
-      password: superAdminConfig.password, // ← Password en texto plano
+      password: superAdminConfig.password,
       role: superAdminConfig.role,
       status: superAdminConfig.status,
       emailVerified: superAdminConfig.emailVerified,
@@ -76,7 +71,6 @@ async function initializeSuperAdmin() {
     console.log('   Role:', superAdmin.role);
     console.log('   Status:', superAdmin.status);
     
-    // Verificar el hash generado
     const result = await dataSource.query(
       'SELECT password FROM users WHERE id = $1',
       [superAdmin.id]
@@ -94,7 +88,6 @@ async function initializeSuperAdmin() {
   }
 }
 
-// Ejecutar si se llama directamente
 if (require.main === module) {
   initializeSuperAdmin();
 }
