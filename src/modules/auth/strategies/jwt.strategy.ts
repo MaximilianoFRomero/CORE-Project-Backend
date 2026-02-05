@@ -1,15 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+// Este archivo debería ser una estrategia Passport, no otro RolesGuard
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { UsersService } from '../../users/users.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(
-    private configService: ConfigService,
-    private usersService: UsersService,
-  ) {
+  constructor(private configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -18,23 +15,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    try {
-      const user = await this.usersService.findOne(payload.sub);
-      
-      if (!user) {
-        throw new UnauthorizedException('User not found');
-      }
-
-      return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        status: user.status,
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid token');
-    }
+    return {
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+    };
   }
 }

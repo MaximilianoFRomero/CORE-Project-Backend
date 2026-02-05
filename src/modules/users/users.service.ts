@@ -18,28 +18,41 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
-  async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
-    const existingUser = await this.usersRepository.findOne({
-      where: { email: createUserDto.email },
-    });
+async create(createUserDto: CreateUserDto, currentUser?: User): Promise<User> {
+  const existingUser = await this.usersRepository.findOne({
+    where: { email: createUserDto.email },
+  });
 
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
+  if (existingUser) {
+    throw new ConflictException('Email already exists');
+  }
+
+  // Validar permisos para crear usuarios con roles elevados
+  if (createUserDto.role && createUserDto.role !== UserRole.USER) {
+    if (!currentUser) {
+      throw new ForbiddenException('Authentication required to create users with custom roles');
     }
-
-    if (createUserDto.role && createUserDto.role !== UserRole.USER) {
-      if (!currentUser || !currentUser.isAdmin()) {
-        throw new ForbiddenException('Only admins can create users with custom roles');
-      }
-    }
-
-    const user = this.usersRepository.create(createUserDto);
     
-    if (!user.status) {
-      user.status = UserStatus.PENDING;
+    if (createUserDto.role === UserRole.SUPER_ADMIN && !currentUser.isSuperAdmin()) {
+      throw new ForbiddenException('Only Super Admins can create other Super Admins');
     }
+    
+    if (!currentUser.isAdmin()) {
+      throw new ForbiddenException('Only admins can create users with custom roles');
+    }
+  }
 
-    return await this.usersRepository.save(user);
+  const user = this.usersRepository.create(createUserDto);
+  
+  if (!user.status) {
+    user.status = UserStatus.PENDING;
+  }
+
+  return await this.usersRepository.save(user);
+}
+
+  isSuperAdmin(user: User): boolean {
+    return user.role === UserRole.SUPER_ADMIN;
   }
 
   async findAll(
@@ -88,12 +101,24 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return await this.usersRepository.findOne({
-      where: { email },
-      select: ['id', 'email', 'password', 'role', 'status', 'firstName', 'lastName'],
-    });
+async findByEmail(email: string): Promise<User | null> {
+  console.log('🔍 Buscando usuario por email:', email);
+  
+  const user = await this.usersRepository
+    .createQueryBuilder('user')
+    .addSelect('user.password') // ← IMPORTANTE: Incluir password
+    .where('user.email = :email', { email })
+    .getOne();
+  
+  console.log('🔍 Usuario encontrado:', user ? 'Sí' : 'No');
+  if (user) {
+    console.log('🔍 Password hash presente:', !!user.password);
+    console.log('🔍 Password hash (primeros 30 chars):', user.password?.substring(0, 30));
+    console.log('🔍 Status:', user.status);
   }
+  
+  return user;
+}
 
   async update(
     id: string,
@@ -189,4 +214,6 @@ export class UsersService {
       lastLoginAt: new Date(),
     });
   }
+
+
 }

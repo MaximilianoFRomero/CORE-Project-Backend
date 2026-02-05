@@ -89,4 +89,25 @@ export class UsersController {
   suspendUser(@Param('id') id: string, @Request() req) {
     return this.usersService.suspendUser(id, req.user);
   }
+
+  // backend/src/modules/users/users.controller.ts - Agregar
+@Post('admin')
+@UseGuards(JwtAuthGuard)
+@Roles(UserRole.SUPER_ADMIN) // Necesitarás implementar este decorador
+async createAdmin(
+  @Body() createUserDto: CreateUserDto,
+  @Request() req,
+) {
+  // Solo Super Admin puede crear otros admins
+  const adminUser = await this.usersService.create({
+    ...createUserDto,
+    role: UserRole.ADMIN,
+    status: UserStatus.ACTIVE,
+  }, req.user);
+  
+  return {
+    message: 'Admin user created successfully',
+    user: adminUser,
+  };
+}
 }

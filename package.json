@@ -6,6 +6,9 @@
     "start:dev": "nest start --watch",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "nest build",
+    "init:superadmin": "ts-node scripts/init-super-admin.ts",
+    "init:superadmin:prod": "node dist/scripts/init-super-admin.js",
+    "reset-admin-password": "ts-node scripts/reset-admin-password.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -30,6 +33,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.19.30",
     "@types/passport-jwt": "^4.0.1",
     "ts-node": "^10.9.2",

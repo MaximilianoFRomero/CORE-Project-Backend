@@ -16,28 +16,46 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
-    
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Account is not active');
-    }
-
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    
-    if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    await this.usersService.updateLastLogin(user.id);
-
-    const { password: _, ...result } = user;
-    return result;
+async validateUser(email: string, password: string): Promise<any> {
+  console.log('🔐 Validando usuario:', email);
+  
+  const user = await this.usersService.findByEmail(email);
+  
+  console.log('🔐 Usuario encontrado en DB:', {
+    exists: !!user,
+    email: user?.email,
+    status: user?.status,
+    passwordLength: user?.password?.length
+  });
+  
+  if (!user) {
+    console.log('❌ Usuario no encontrado');
+    throw new UnauthorizedException('Invalid credentials');
   }
+
+  if (user.status !== UserStatus.ACTIVE) {
+    console.log('❌ Usuario no activo:', user.status);
+    throw new UnauthorizedException('Account is not active');
+  }
+
+  console.log('🔐 Comparando contraseñas...');
+  console.log('   Password ingresado:', password);
+  console.log('   Hash en DB (primeros 30):', user.password?.substring(0, 30));
+  
+  const isValidPassword = await bcrypt.compare(password, user.password);
+  
+  console.log('🔐 Resultado comparación:', isValidPassword);
+  
+  if (!isValidPassword) {
+    console.log('❌ Contraseña inválida');
+    throw new UnauthorizedException('Invalid credentials');
+  }
+
+  await this.usersService.updateLastLogin(user.id);
+
+  const { password: _, ...result } = user;
+  return result;
+}
 
   async login(loginUserDto: LoginUserDto) {
     const user = await this.validateUser(loginUserDto.email, loginUserDto.password);

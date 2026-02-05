@@ -9,8 +9,10 @@ import {
 } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
+
 export enum UserRole {
   ADMIN = 'admin',
+  SUPER_ADMIN = 'super_admin', 
   USER = 'user',
   VIEWER = 'viewer',
 }
@@ -98,6 +100,10 @@ export class User {
   }
 
   isAdmin(): boolean {
-    return this.role === UserRole.ADMIN;
+    return this.role === UserRole.ADMIN || this.role === UserRole.SUPER_ADMIN;
+  }
+
+  isSuperAdmin(): boolean {
+    return this.role === UserRole.SUPER_ADMIN;
   }
 }
