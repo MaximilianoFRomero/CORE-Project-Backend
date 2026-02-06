@@ -23,6 +23,13 @@ export enum ProjectFramework {
   ANGULAR = 'angular',
 }
 
+export enum ProjectDatabase {
+  POSTGRESQL = 'postgresql',
+  MYSQL = 'mysql',
+  MONGODB = 'mongodb',
+  REDIS = 'redis',
+}
+
 @Entity('projects')
 export class Project {
   @PrimaryGeneratedColumn('uuid')
@@ -51,7 +58,7 @@ export class Project {
   })
   framework: ProjectFramework;
 
-  @Column({ type: 'simple-array', default: 'postgresql' })
+  @Column({ type: 'simple-array', default: ProjectDatabase.POSTGRESQL })
   databases: string[];
 
   @Column({ type: 'boolean', default: false })

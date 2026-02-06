@@ -11,8 +11,8 @@ import * as bcrypt from 'bcrypt';
 
 
 export enum UserRole {
-  ADMIN = 'admin',
   SUPER_ADMIN = 'super_admin', 
+  ADMIN = 'admin',
   USER = 'user',
   VIEWER = 'viewer',
 }
