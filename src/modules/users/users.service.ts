@@ -18,46 +18,41 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
-async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
-  console.log('=== USERS SERVICE CREATE ===');
-  console.log('Current user:', currentUser);
-  console.log('Current user role:', currentUser?.role);
-  console.log('Requested role:', createUserDto.role);
+  async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
+    console.log('=== USERS SERVICE CREATE ===');
+    console.log('Current user:', currentUser);
+    console.log('Current user role:', currentUser?.role);
+    console.log('Requested role:', createUserDto.role);
 
-  const existingUser = await this.usersRepository.findOne({
-    where: { email: createUserDto.email },
-  });
+    const existingUser = await this.usersRepository.findOne({
+      where: { email: createUserDto.email },
+    });
 
-  if (existingUser) {
-    throw new ConflictException('Email already exists');
-  }
-
-  if (createUserDto.role && createUserDto.role !== UserRole.USER) {
-    if (!currentUser) {
-      throw new ForbiddenException('Authentication required to create users with custom roles');
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
     }
+
+    if (createUserDto.role && createUserDto.role !== UserRole.USER) {
+      if (!currentUser) {
+        throw new ForbiddenException('Authentication required to create users with custom roles');
+      }
+      
+      if (createUserDto.role === UserRole.SUPER_ADMIN && !this.isUserSuperAdmin(currentUser)) {
+        throw new ForbiddenException('Only Super Admins can create other Super Admins');
+      }
+      
+      if (!this.isUserAdmin(currentUser)) {
+        throw new ForbiddenException('Only admins can create users with custom roles');
+      }
+    }
+
+    const user = this.usersRepository.create(createUserDto);
     
-    if (createUserDto.role === UserRole.SUPER_ADMIN && currentUser.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Only Super Admins can create other Super Admins');
+    if (!user.status) {
+      user.status = UserStatus.PENDING;
     }
-    
-    const isAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN;
-    if (!isAdmin) {
-      throw new ForbiddenException('Only admins can create users with custom roles');
-    }
-  }
 
-  const user = this.usersRepository.create(createUserDto);
-  
-  if (!user.status) {
-    user.status = UserStatus.PENDING;
-  }
-
-  return await this.usersRepository.save(user);
-}
-
-  isSuperAdmin(user: User): boolean {
-    return user.role === UserRole.SUPER_ADMIN;
+    return await this.usersRepository.save(user);
   }
 
   async findAll(
@@ -66,7 +61,7 @@ async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
       role?: UserRole;
       search?: string;
     },
-    currentUser?: User,
+    currentUser?: any,
   ): Promise<User[]> {
     const query = this.usersRepository.createQueryBuilder('user');
 
@@ -85,62 +80,62 @@ async create(createUserDto: CreateUserDto, currentUser?: any): Promise<User> {
       );
     }
 
-    if (!currentUser?.isAdmin()) {
+    if (!this.isUserAdmin(currentUser)) {
       query.andWhere('user.status = :activeStatus', { activeStatus: UserStatus.ACTIVE });
     }
 
     return await query.orderBy('user.createdAt', 'DESC').getMany();
   }
 
-  async findOne(id: string, currentUser?: User): Promise<User> {
+  async findOne(id: string, currentUser?: any): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id } });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    if (!user.isActive() && !currentUser?.isAdmin()) {
+    if (!user.isActive() && !this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('Cannot view this user');
     }
 
     return user;
   }
 
-async findByEmail(email: string): Promise<User | null> {
-  console.log('🔍 Buscando usuario por email:', email);
-  
-  const user = await this.usersRepository
-    .createQueryBuilder('user')
-    .addSelect('user.password')
-    .where('user.email = :email', { email })
-    .getOne();
-  
-  console.log('🔍 Usuario encontrado:', user ? 'Sí' : 'No');
-  if (user) {
-    console.log('🔍 Password hash presente:', !!user.password);
-    console.log('🔍 Password hash (primeros 30 chars):', user.password?.substring(0, 30));
-    console.log('🔍 Status:', user.status);
+  async findByEmail(email: string): Promise<User | null> {
+    console.log('🔍 Buscando usuario por email:', email);
+    
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
+    
+    console.log('🔍 Usuario encontrado:', user ? 'Sí' : 'No');
+    if (user) {
+      console.log('🔍 Password hash presente:', !!user.password);
+      console.log('🔍 Password hash (primeros 30 chars):', user.password?.substring(0, 30));
+      console.log('🔍 Status:', user.status);
+    }
+    
+    return user;
   }
-  
-  return user;
-}
 
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
-    currentUser?: User,
+    currentUser?: any,
   ): Promise<User> {
     const user = await this.findOne(id, currentUser);
 
-    if (currentUser?.id !== id && !currentUser?.isAdmin()) {
+    if (currentUser?.id !== id && !this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('You can only update your own profile');
     }
 
-    if (updateUserDto.role && !currentUser?.isAdmin()) {
+    if (updateUserDto.role && !this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('Only admins can change user roles');
     }
 
-    if (updateUserDto.status && !currentUser?.isAdmin()) {
+    if (updateUserDto.status && !this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('Only admins can change user status');
     }
 
@@ -148,22 +143,22 @@ async findByEmail(email: string): Promise<User | null> {
     return await this.usersRepository.save(user);
   }
 
-  async remove(id: string, currentUser?: User): Promise<void> {
+  async remove(id: string, currentUser?: any): Promise<void> {
     const user = await this.findOne(id, currentUser);
 
-    if (!currentUser?.isAdmin()) {
+    if (!this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('Only admins can delete users');
     }
 
-    if (currentUser.id === id) {
+    if (currentUser?.id === id) {
       throw new BadRequestException('Cannot delete your own account');
     }
 
     await this.usersRepository.remove(user);
   }
 
-  async activateUser(id: string, currentUser: User): Promise<User> {
-    if (!currentUser.isAdmin()) {
+  async activateUser(id: string, currentUser: any): Promise<User> {
+    if (!this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('Only admins can activate users');
     }
 
@@ -172,8 +167,8 @@ async findByEmail(email: string): Promise<User | null> {
     return await this.usersRepository.save(user);
   }
 
-  async suspendUser(id: string, currentUser: User): Promise<User> {
-    if (!currentUser.isAdmin()) {
+  async suspendUser(id: string, currentUser: any): Promise<User> {
+    if (!this.isUserAdmin(currentUser)) {
       throw new ForbiddenException('Only admins can suspend users');
     }
 
@@ -182,8 +177,8 @@ async findByEmail(email: string): Promise<User | null> {
     return await this.usersRepository.save(user);
   }
 
-  async getStats(currentUser?: User) {
-    const isAdmin = currentUser?.isAdmin();
+  async getStats(currentUser?: any) {
+    const isAdmin = this.isUserAdmin(currentUser);
 
     const query = this.usersRepository.createQueryBuilder('user');
     
@@ -220,15 +215,17 @@ async findByEmail(email: string): Promise<User | null> {
     });
   }
 
+  private isUserAdmin(user: any): boolean {
+    if (!user || !user.role) return false;
+    return user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+  }
 
-}
+  private isUserSuperAdmin(user: any): boolean {
+    if (!user || !user.role) return false;
+    return user.role === UserRole.SUPER_ADMIN;
+  }
 
-export function hasAdminRole(user: any): boolean {
-  if (!user || !user.role) return false;
-  return user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
-}
-
-export function hasSuperAdminRole(user: any): boolean {
-  if (!user || !user.role) return false;
-  return user.role === UserRole.SUPER_ADMIN;
+  isSuperAdmin(user: User): boolean {
+    return user.role === UserRole.SUPER_ADMIN;
+  }
 }
