@@ -9,10 +9,12 @@ import {
   Query,
   Request,
   ParseUUIDPipe,
+  Patch,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { CreateAdminUserDto } from './dto/create-admin-user.dto'; // NUEVO
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -34,33 +36,44 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-@Post('admin')
-@Roles(UserRole.SUPER_ADMIN)
-async createAdminUser(
-  @Body() createAdminUserDto: CreateAdminUserDto,
-  @Request() req,
-) {
-  console.log('=== CREATE ADMIN USER ===');
-  
-  const currentUserEntity = await this.usersService.findOne(req.user.sub, req.user);
-  
-  let password = createAdminUserDto.password;
-  if (createAdminUserDto.generatePassword && !password) {
-    password = this.generateRandomPassword();
+  @Post('admin')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create admin user (super-admin only)' })
+  @ApiResponse({ status: 201, description: 'Admin user created successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async createAdminUser(
+    @Body() createAdminUserDto: CreateAdminUserDto,
+    @Request() req,
+  ) {
+    console.log('=== CREATE ADMIN USER ===');
+    console.log('Current user from JWT:', req.user);
+    
+    const currentUser = req.user;
+    
+    if (currentUser.role !== UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Only super admins can create admin users');
+    }
+    
+    let password = createAdminUserDto.password;
+    if (createAdminUserDto.generatePassword && !password) {
+      password = this.generateRandomPassword();
+      console.log('Generated password:', password);
+    }
+
+    const createUserDto: CreateUserDto = {
+      email: createAdminUserDto.email,
+      firstName: createAdminUserDto.firstName,
+      lastName: createAdminUserDto.lastName,
+      password: password!,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+      avatarUrl: createAdminUserDto.avatarUrl,
+    };
+
+    console.log('Creating user with DTO:', createUserDto);
+    
+    return this.usersService.create(createUserDto, currentUser);
   }
-
-  const createUserDto: CreateUserDto = {
-    email: createAdminUserDto.email,
-    firstName: createAdminUserDto.firstName,
-    lastName: createAdminUserDto.lastName,
-    password: password!,
-    role: UserRole.ADMIN,
-    status: UserStatus.ACTIVE,
-    avatarUrl: createAdminUserDto.avatarUrl,
-  };
-
-  return this.usersService.create(createUserDto, currentUserEntity);
-}
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -85,7 +98,7 @@ async createAdminUser(
     return this.usersService.findOne(id, currentUser);
   }
 
-  @Post(':id')
+  @Patch(':id')
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
