@@ -60,6 +60,94 @@ Una API RESTful escalable construida con NestJS que potencia la próxima generac
     └──────────┘        └──────────┘        └──────────┘
 ```
 
+## 📡 Estructura de Rutas
+```
+backend/
+├── 📄 Archivos de configuracion
+│   ├── .env                          # Variables de entorno
+│   ├── .prettierrc                   # Configuración Prettier
+│   ├── eslint.config.mjs             # Configuración ESLint
+│   ├── nest-cli.json                 # Configuración NestJS CLI
+│   ├── tsconfig.json                 # Configuración TypeScript
+│   ├── tsconfig.build.json           # Build TypeScript config
+│   ├── package.json                  # Dependencias del proyecto
+│   ├── docker-compose.yml            # Docker PostgreSQL
+│   └── README.md                     # Documentación
+│
+├── 📁 scripts/                       # Scripts de utilidad
+│   ├── init-super-admin.ts           # Crear super admin
+│   └── reset-admin-password.ts       # Resetear contraseña
+│
+├── 📁 src/                           # Código fuente
+│   ├── main.ts                       # Punto de entrada
+│   ├── app.module.ts                 # Módulo raíz
+│   ├── app.controller.ts             # Controlador raíz
+│   ├── app.service.ts                # Servicio raíz
+│   │
+│   ├── 📁 config/                    # Configuración (vacío)
+│   │
+│   ├── 📁 database/                  # Configuración de BD
+│   │   ├── data-source.ts            # TypeORM DataSource
+│   │   └── seeds/
+│   │       └── super-admin.seed.ts   # Seed super admin
+│   │
+│   ├── 📁 shared/                    # Recursos compartidos (vacío)
+│   │
+│   └── 📁 modules/                   # Módulos de la aplicación
+│       │
+│       ├── 📁 auth/                  # Autenticación y Autorización
+│       │   ├── auth.module.ts
+│       │   ├── auth.service.ts       # Login, registro, validación
+│       │   ├── auth.controller.ts    # POST /auth/login, /auth/register
+│       │   ├── decorators/
+│       │   │   └── roles.decorator.ts
+│       │   ├── guards/
+│       │   │   ├── jwt-auth.guard.ts
+│       │   │   └── roles.guard.ts
+│       │   └── strategies/
+│       │       └── jwt.strategy.ts
+│       │
+│       ├── 📁 users/                 # Gestión de Usuarios
+│       │   ├── users.module.ts
+│       │   ├── users.service.ts      # CRUD, cambio rol/status
+│       │   ├── users.controller.ts   # /users endpoints
+│       │   ├── entities/
+│       │   │   └── user.entity.ts    # User, UserRole, UserStatus
+│       │   └── dto/
+│       │       ├── create-user.dto.ts
+│       │       ├── create-admin-user.dto.ts
+│       │       ├── update-user.dto.ts
+│       │       └── login-user.dto.ts
+│       │
+│       ├── 📁 projects/              # Gestión de Proyectos
+│       │   ├── projects.module.ts
+│       │   ├── projects.service.ts   # CRUD proyectos
+│       │   ├── projects.controller.ts # /projects endpoints
+│       │   ├── entities/
+│       │   │   └── project.entity.ts # Project, Framework, Database
+│       │   └── dto/
+│       │       ├── create-project.dto.ts
+│       │       └── update-project.dto.ts
+│       │
+│       ├── 📁 deployments/           # Gestión de Despliegues
+│       │   ├── deployments.module.ts
+│       │   ├── deployments.service.ts # Deploy management
+│       │   ├── deployments.controller.ts # /deployments endpoints
+│       │   ├── entities/
+│       │   │   └── deployment.entity.ts # Deployment, Status, Environment
+│       │   └── dto/
+│       │       ├── create-deployment.dto.ts
+│       │       └── update-deployment.dto.ts
+│       │
+│       └── 📁 ai/                    # Módulo AI (Futuro)
+│
+└── 📁 test/                          # Tests
+    ├── app.e2e-spec.ts
+    └── jest-e2e.json
+
+```
+
+
 ## 🚀 Comenzando
 
 ### Prerrequisitos
