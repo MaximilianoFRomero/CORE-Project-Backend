@@ -11,6 +11,8 @@ import {
   ParseUUIDPipe,
   Patch,
   ForbiddenException,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -21,6 +23,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole, UserStatus } from './entities/user.entity';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { CreateUserBySuperAdminDto } from './dto/create-user-by-super-admin.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -35,6 +38,37 @@ export class UsersController {
     createUserDto.role = UserRole.USER;
     return this.usersService.create(createUserDto);
   }
+
+  @Post()
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create any user (super-admin only)' })
+  @ApiResponse({ status: 201, description: 'User created successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  async createUserBySuperAdmin(
+    @Body() createUserDto: CreateUserBySuperAdminDto,
+    @Request() req,
+  ) {
+    const currentUser = req.user;
+    
+    // Prevenir creación de SUPER_ADMIN desde este endpoint
+    if (createUserDto.role === UserRole.SUPER_ADMIN) {
+      throw new ForbiddenException('Cannot create another Super Admin user');
+    }
+
+    // Si generatePassword es true, generar contraseña automática
+    let password = createUserDto.password;
+    if (createUserDto.generatePassword && !password) {
+      password = this.generateRandomPassword();
+    // Opcional: devolver la contraseña generada en la respuesta
+    }
+
+  const userToCreate = {
+    ...createUserDto,
+    password: password!,
+  };
+
+  return this.usersService.create(userToCreate, currentUser);
+}
 
   @Post('admin')
   @Roles(UserRole.SUPER_ADMIN)
@@ -110,6 +144,7 @@ export class UsersController {
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req,
