@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: core-platform-backend
+    runtime: node
+    plan: standard
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DB_HOST
+      - key: DB_PORT
+      - key: DB_USERNAME
+      - key: DB_PASSWORD
+      - key: DB_NAME
+      - key: JWT_SECRET
+      - key: CORS_ORIGIN
+      - key: REFRESH_TOKEN_SECRET

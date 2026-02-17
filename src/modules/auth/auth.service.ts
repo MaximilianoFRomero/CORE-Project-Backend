@@ -7,10 +7,14 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { LoginUserDto } from '../users/dto/login-user.dto';
 import { User, UserStatus } from '../users/entities/user.entity';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
+  // Almacenar refresh tokens revocados (en producción usar Redis)
+  private revokedTokens = new Set<string>();
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
@@ -68,9 +72,20 @@ async validateUser(email: string, password: string): Promise<any> {
       lastName: user.lastName,
     };
 
+    // Access token: 15-30 minutos
+    const accessToken = this.jwtService.sign(payload, { 
+      expiresIn: '15m' // Configurable vía .env
+    });
+
+    // Refresh token: 7 días
+    const refreshToken = this.jwtService.sign(payload, { 
+      expiresIn: '7d' 
+    });
+
     return {
-      access_token: this.jwtService.sign(payload),
-      refresh_token: this.jwtService.sign(payload, { expiresIn: '7d' }),
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expiresIn: 900, // 15 minutos en segundos
       user: {
         id: user.id,
         email: user.email,
@@ -82,15 +97,33 @@ async validateUser(email: string, password: string): Promise<any> {
     };
   }
 
-  async refreshToken(refreshToken: string) {
+  /**
+   * Refresh Token Endpoint
+   * 
+   * Valida el refresh token y emite uno nuevo.
+   * 
+   * @param refreshToken - El refresh token del usuario
+   * @returns Nuevo access_token y refresh_token
+   * @throws UnauthorizedException si el token es inválido o expiró
+   */
+  async refreshToken(refreshTokenString: string) {
     try {
-      const payload = this.jwtService.verify(refreshToken);
+      // Verificar que el token no ha sido revocado
+      if (this.revokedTokens.has(refreshTokenString)) {
+        throw new UnauthorizedException('Refresh token has been revoked');
+      }
+
+      // Validar la firma JWT
+      const payload = this.jwtService.verify(refreshTokenString);
+      
+      // Obtener usuario y verificar que siga activo
       const user = await this.usersService.findOne(payload.sub);
 
       if (user.status !== UserStatus.ACTIVE) {
         throw new UnauthorizedException('Account is not active');
       }
 
+      // Crear nuevo payload
       const newPayload = {
         sub: user.id,
         email: user.email,
@@ -99,11 +132,31 @@ async validateUser(email: string, password: string): Promise<any> {
         lastName: user.lastName,
       };
 
+      // Generar nuevos tokens
+      const newAccessToken = this.jwtService.sign(newPayload, { 
+        expiresIn: '15m' 
+      });
+
+      const newRefreshToken = this.jwtService.sign(newPayload, { 
+        expiresIn: '7d' 
+      });
+
       return {
-        access_token: this.jwtService.sign(newPayload),
-        refresh_token: this.jwtService.sign(newPayload, { expiresIn: '7d' }),
+        access_token: newAccessToken,
+        refresh_token: newRefreshToken,
+        expiresIn: 900, // 15 minutos en segundos
       };
-    } catch (error) {
+    } catch (error: any) {
+      // Diferenciar entre errores de expiración y otros
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Refresh token has expired');
+      }
+      if (error.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('Invalid refresh token signature');
+      }
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -127,5 +180,83 @@ async validateUser(email: string, password: string): Promise<any> {
       message: 'Registration successful. Please check your email to verify your account.',
       userId: user.id,
     };
+  }
+
+  /**
+   * Logout Endpoint
+   * 
+   * Invalida el refresh token del usuario.
+   * El frontend debe limpiar los tokens locales.
+   * 
+   * @param refreshToken - El refresh token a revocar
+   * @returns Mensaje de éxito
+   */
+  async logout(refreshToken: string): Promise<{ message: string }> {
+    try {
+      // Verificar que el token es válido antes de revocarlo
+      this.jwtService.verify(refreshToken);
+      
+      // Agregar a lista de revocados
+      this.revokedTokens.add(refreshToken);
+      
+      // TODO: En producción, guardar en Redis o BD
+      // await this.tokenBlacklistService.add(refreshToken);
+      
+      return { message: 'Logged out successfully' };
+    } catch (error) {
+      // Incluso si el token es inválido, consideramos el logout exitoso
+      // para evitar confundir al cliente
+      return { message: 'Logged out successfully' };
+    }
+  }
+
+  /**
+   * Forgot Password Endpoint
+   * 
+   * Genera un token de reset y lo envía por email al usuario.
+   * 
+   * @param email - Email del usuario
+   * @returns Mensaje indicando que el email fue enviado
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    try {
+      const user = await this.usersService.findByEmail(email);
+      
+      if (!user) {
+        // Por seguridad, no revelamos si el email existe o no
+        // Retornamos éxito de todos modos
+        return {
+          message: 'If an account with this email exists, you will receive a password reset link shortly.',
+        };
+      }
+
+      // Generar token de reset (válido por 1 hora)
+      const resetToken = this.jwtService.sign(
+        {
+          sub: user.id,
+          email: user.email,
+          type: 'password-reset',
+        },
+        { expiresIn: '1h' }
+      );
+
+      // TODO: Guardar token en BD con expiration
+      // await this.passwordResetService.create(user.id, resetToken);
+
+      // TODO: Enviar email con link de reset
+      // const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+      // await this.emailService.sendPasswordResetEmail(user.email, resetLink);
+
+      console.log(`📧 Reset token para ${email}:`, resetToken);
+
+      return {
+        message: 'If an account with this email exists, you will receive a password reset link shortly.',
+      };
+    } catch (error) {
+      // Por seguridad, no revelamos errores
+      return {
+        message: 'If an account with this email exists, you will receive a password reset link shortly.',
+      };
+    }
   }
 }

@@ -39,6 +39,15 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
+  @Get('profile/me')
+  @ApiOperation({ summary: 'Get current authenticated user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or expired token' })
+  async getCurrentUserProfile(@Request() req) {
+    const currentUser = req.user;
+    return this.usersService.findOne(currentUser.sub, currentUser);
+  }
+
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create any user (super-admin only)' })
