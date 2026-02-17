@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "scripts": {
-    "start": "node dist/main",
+    "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "nest build",
