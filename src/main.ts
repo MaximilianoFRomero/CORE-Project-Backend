@@ -9,10 +9,20 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   
   // CORS
-  app.enableCors({
-    origin: configService.get('CORS_ORIGIN') || 'http://localhost:3000',
-    credentials: true,
-  });
+app.enableCors({
+  origin: (origin, callback) => {
+    if (
+      !origin || // herramientas como Postman
+      origin.includes('vercel.app') ||
+      origin.includes('localhost')
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+});
   
   // Global prefix
   app.setGlobalPrefix('api/v1');

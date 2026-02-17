@@ -3,7 +3,7 @@ import { User, UserRole, UserStatus } from '../src/modules/users/entities/user.e
 
 async function initializeSuperAdmin() {
   console.log('🚀 Inicializando Super Administrador...');
-  
+
   const dataSource = new DataSource({
     type: 'postgres',
     host: process.env.DB_HOST || 'localhost',
@@ -18,19 +18,19 @@ async function initializeSuperAdmin() {
   try {
     await dataSource.initialize();
     console.log('✅ Conectado a la base de datos');
-    
+
     const userRepository = dataSource.getRepository(User);
-    
+
     const existingSuperAdmin = await userRepository.findOne({
       where: { role: UserRole.SUPER_ADMIN }
     });
-    
+
     if (existingSuperAdmin) {
       console.log('✅ Super Admin ya existe:');
       console.log('   Email:', existingSuperAdmin.email);
       console.log('   Role:', existingSuperAdmin.role);
       console.log('   Status:', existingSuperAdmin.status);
-      
+
       const result = await dataSource.query(
         'SELECT password FROM users WHERE id = $1',
         [existingSuperAdmin.id]
@@ -38,7 +38,7 @@ async function initializeSuperAdmin() {
       console.log('   Password hash (first 30 chars):', result[0]?.password?.substring(0, 30));
       return;
     }
-    
+
     const superAdminConfig = {
       email: process.env.SUPER_ADMIN_EMAIL || 'superadmin@coreplatform.dev',
       firstName: process.env.SUPER_ADMIN_FIRST_NAME || 'System',
@@ -48,10 +48,10 @@ async function initializeSuperAdmin() {
       status: UserStatus.ACTIVE,
       emailVerified: true,
     };
-    
+
     console.log('📝 Configurando Super Admin:', superAdminConfig.email);
     console.log('📝 Password plaintext:', superAdminConfig.password);
-    
+
     const superAdmin = userRepository.create({
       email: superAdminConfig.email,
       firstName: superAdminConfig.firstName,
@@ -61,25 +61,25 @@ async function initializeSuperAdmin() {
       status: superAdminConfig.status,
       emailVerified: superAdminConfig.emailVerified,
     });
-    
+
     await userRepository.save(superAdmin);
-    
+
     console.log('🎉 Super Admin creado exitosamente!');
     console.log('📋 Credenciales:');
     console.log('   Email:', superAdmin.email);
     console.log('   Password (plaintext):', superAdminConfig.password);
     console.log('   Role:', superAdmin.role);
     console.log('   Status:', superAdmin.status);
-    
+
     const result = await dataSource.query(
       'SELECT password FROM users WHERE id = $1',
       [superAdmin.id]
     );
     console.log('   Password hash (first 30 chars):', result[0]?.password?.substring(0, 30));
-    
+
     console.log('\n⚠️  GUARDA ESTAS CREDENCIALES EN UN LUGAR SEGURO ⚠️');
     console.log('   Cambia la contraseña en el primer inicio de sesión.');
-    
+
   } catch (error) {
     console.error('❌ Error al crear Super Admin:', error);
     process.exit(1);
