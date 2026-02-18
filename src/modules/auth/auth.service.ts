@@ -4,7 +4,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { UsersService } from '../users/users.service';
+import { TokenBlacklist } from './entities/token-blacklist.entity';
 import { LoginUserDto } from '../users/dto/login-user.dto';
 import { User, UserStatus } from '../users/entities/user.entity';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -18,52 +21,54 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+    @InjectRepository(TokenBlacklist)
+    private tokenBlacklistRepository: Repository<TokenBlacklist>,
+  ) { }
 
-async validateUser(email: string, password: string): Promise<any> {
-  console.log('🔐 Validando usuario:', email);
-  
-  const user = await this.usersService.findByEmail(email);
-  
-  console.log('🔐 Usuario encontrado en DB:', {
-    exists: !!user,
-    email: user?.email,
-    status: user?.status,
-    passwordLength: user?.password?.length
-  });
-  
-  if (!user) {
-    console.log('❌ Usuario no encontrado');
-    throw new UnauthorizedException('Invalid credentials');
+  async validateUser(email: string, password: string): Promise<any> {
+    console.log('🔐 Validando usuario:', email);
+
+    const user = await this.usersService.findByEmail(email);
+
+    console.log('🔐 Usuario encontrado en DB:', {
+      exists: !!user,
+      email: user?.email,
+      status: user?.status,
+      passwordLength: user?.password?.length
+    });
+
+    if (!user) {
+      console.log('❌ Usuario no encontrado');
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      console.log('❌ Usuario no activo:', user.status);
+      throw new UnauthorizedException('Account is not active');
+    }
+
+    console.log('🔐 Comparando contraseñas...');
+    console.log('   Password ingresado:', password);
+    console.log('   Hash en DB (primeros 30):', user.password?.substring(0, 30));
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+
+    console.log('🔐 Resultado comparación:', isValidPassword);
+
+    if (!isValidPassword) {
+      console.log('❌ Contraseña inválida');
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    await this.usersService.updateLastLogin(user.id);
+
+    const { password: _, ...result } = user;
+    return result;
   }
-
-  if (user.status !== UserStatus.ACTIVE) {
-    console.log('❌ Usuario no activo:', user.status);
-    throw new UnauthorizedException('Account is not active');
-  }
-
-  console.log('🔐 Comparando contraseñas...');
-  console.log('   Password ingresado:', password);
-  console.log('   Hash en DB (primeros 30):', user.password?.substring(0, 30));
-  
-  const isValidPassword = await bcrypt.compare(password, user.password);
-  
-  console.log('🔐 Resultado comparación:', isValidPassword);
-  
-  if (!isValidPassword) {
-    console.log('❌ Contraseña inválida');
-    throw new UnauthorizedException('Invalid credentials');
-  }
-
-  await this.usersService.updateLastLogin(user.id);
-
-  const { password: _, ...result } = user;
-  return result;
-}
 
   async login(loginUserDto: LoginUserDto) {
     const user = await this.validateUser(loginUserDto.email, loginUserDto.password);
-    
+
     const payload = {
       sub: user.id,
       email: user.email,
@@ -72,20 +77,24 @@ async validateUser(email: string, password: string): Promise<any> {
       lastName: user.lastName,
     };
 
-    // Access token: 15-30 minutos
-    const accessToken = this.jwtService.sign(payload, { 
-      expiresIn: '15m' // Configurable vía .env
+    // Access token: 15 minutos
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: '15m'
     });
 
-    // Refresh token: 7 días
-    const refreshToken = this.jwtService.sign(payload, { 
-      expiresIn: '7d' 
+    // Refresh token: 30 días si rememberMe es true, sino 7 días
+    const refreshTokenExpiresIn = loginUserDto.rememberMe ? '30d' : '7d';
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: refreshTokenExpiresIn
     });
+
+    // Calcular expiresIn en segundos para el frontend
+    const accessExpiresIn = 900; // 15m
 
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
-      expiresIn: 900, // 15 minutos en segundos
+      expiresIn: accessExpiresIn,
       user: {
         id: user.id,
         email: user.email,
@@ -108,14 +117,15 @@ async validateUser(email: string, password: string): Promise<any> {
    */
   async refreshToken(refreshTokenString: string) {
     try {
-      // Verificar que el token no ha sido revocado
-      if (this.revokedTokens.has(refreshTokenString)) {
+      // Verificar que el token no ha sido revocado en la base de datos
+      const isRevoked = await this.isTokenRevoked(refreshTokenString);
+      if (isRevoked) {
         throw new UnauthorizedException('Refresh token has been revoked');
       }
 
       // Validar la firma JWT
       const payload = this.jwtService.verify(refreshTokenString);
-      
+
       // Obtener usuario y verificar que siga activo
       const user = await this.usersService.findOne(payload.sub);
 
@@ -133,12 +143,12 @@ async validateUser(email: string, password: string): Promise<any> {
       };
 
       // Generar nuevos tokens
-      const newAccessToken = this.jwtService.sign(newPayload, { 
-        expiresIn: '15m' 
+      const newAccessToken = this.jwtService.sign(newPayload, {
+        expiresIn: '15m'
       });
 
-      const newRefreshToken = this.jwtService.sign(newPayload, { 
-        expiresIn: '7d' 
+      const newRefreshToken = this.jwtService.sign(newPayload, {
+        expiresIn: '7d'
       });
 
       return {
@@ -163,7 +173,7 @@ async validateUser(email: string, password: string): Promise<any> {
 
   async register(createUserDto: any) {
     const existingUser = await this.usersService.findByEmail(createUserDto.email);
-    
+
     if (existingUser) {
       throw new BadRequestException('Email already exists');
     }
@@ -193,21 +203,39 @@ async validateUser(email: string, password: string): Promise<any> {
    */
   async logout(refreshToken: string): Promise<{ message: string }> {
     try {
-      // Verificar que el token es válido antes de revocarlo
-      this.jwtService.verify(refreshToken);
-      
-      // Agregar a lista de revocados
-      this.revokedTokens.add(refreshToken);
-      
-      // TODO: En producción, guardar en Redis o BD
-      // await this.tokenBlacklistService.add(refreshToken);
-      
+      if (!refreshToken) {
+        return { message: 'Logged out successfully' };
+      }
+
+      // Validar el token y obtener expiración
+      const payload = this.jwtService.verify(refreshToken);
+
+      // Guardar en la lista negra persistente
+      const blacklistEntry = this.tokenBlacklistRepository.create({
+        token: refreshToken,
+        expiresAt: new Date(payload.exp * 1000),
+      });
+
+      await this.tokenBlacklistRepository.save(blacklistEntry);
+
       return { message: 'Logged out successfully' };
     } catch (error) {
-      // Incluso si el token es inválido, consideramos el logout exitoso
-      // para evitar confundir al cliente
+      // Incluso si el token es inválido o ya expiró, consideramos el logout exitoso
       return { message: 'Logged out successfully' };
     }
+  }
+
+  /**
+   * Verifica si un token está en la lista negra
+   */
+  async isTokenRevoked(token: string): Promise<boolean> {
+    const entry = await this.tokenBlacklistRepository.findOne({
+      where: {
+        token,
+        expiresAt: MoreThan(new Date()) // Solo tokens que aún no habrían expirado naturalmente
+      },
+    });
+    return !!entry;
   }
 
   /**
@@ -221,7 +249,7 @@ async validateUser(email: string, password: string): Promise<any> {
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
       const user = await this.usersService.findByEmail(email);
-      
+
       if (!user) {
         // Por seguridad, no revelamos si el email existe o no
         // Retornamos éxito de todos modos
