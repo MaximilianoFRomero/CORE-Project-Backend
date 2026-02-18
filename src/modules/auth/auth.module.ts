@@ -6,6 +6,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { TokenBlacklist } from './entities/token-blacklist.entity';
 import { RateLimitMiddleware } from './middleware/rate-limit.middleware';
 import { JWT_CONFIG } from '../../config/jwt.config';
 
@@ -13,6 +15,7 @@ import { JWT_CONFIG } from '../../config/jwt.config';
   imports: [
     UsersModule,
     PassportModule,
+    TypeOrmModule.forFeature([TokenBlacklist]),
     JwtModule.register({
       secret: process.env.JWT_SECRET || JWT_CONFIG.JWT_SECRET,
       signOptions: {
