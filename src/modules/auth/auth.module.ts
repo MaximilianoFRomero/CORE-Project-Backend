@@ -19,7 +19,7 @@ import { JWT_CONFIG } from '../../config/jwt.config';
     JwtModule.register({
       secret: process.env.JWT_SECRET || JWT_CONFIG.JWT_SECRET,
       signOptions: {
-        expiresIn: 900, // 15 minutos en segundos
+        expiresIn: 900,
       },
     }),
   ],
@@ -29,7 +29,6 @@ import { JWT_CONFIG } from '../../config/jwt.config';
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Aplicar rate limiting a endpoints críticos
     consumer
       .apply(RateLimitMiddleware)
       .forRoutes(

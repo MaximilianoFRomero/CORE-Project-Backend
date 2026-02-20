@@ -1,4 +1,3 @@
-// src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
@@ -8,11 +7,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   
-  // CORS
 app.enableCors({
   origin: (origin, callback) => {
     if (
-      !origin || // herramientas como Postman
+      !origin ||
       origin.includes('vercel.app') ||
       origin.includes('localhost')
     ) {
@@ -24,10 +22,8 @@ app.enableCors({
   credentials: true,
 });
   
-  // Global prefix
   app.setGlobalPrefix('api/v1');
   
-  // Validation pipe
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     transform: true,

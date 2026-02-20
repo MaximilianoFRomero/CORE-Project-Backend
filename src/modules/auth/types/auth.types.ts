@@ -1,12 +1,3 @@
-/**
- * auth.types.ts
- * 
- * Tipos TypeScript para la API de autenticación
- * Usar en el frontend para type safety
- */
-
-// ===== TIPOS DE USUARIO =====
-
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   ADMIN = 'admin',
@@ -23,7 +14,6 @@ export interface AuthUser {
   avatarUrl?: string;
 }
 
-// ===== TIPOS DE REQUEST/RESPONSE =====
 
 export interface LoginRequest {
   email: string;
@@ -34,7 +24,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;
-  expiresIn: number; // en segundos
+  expiresIn: number;
   user: AuthUser;
 }
 
@@ -45,7 +35,7 @@ export interface RefreshTokenRequest {
 export interface RefreshTokenResponse {
   access_token: string;
   refresh_token: string;
-  expiresIn: number; // en segundos
+  expiresIn: number;
 }
 
 export interface LogoutRequest {
@@ -69,15 +59,11 @@ export interface ValidateTokenResponse {
   user: AuthUser;
 }
 
-// ===== TIPOS DE ERROR =====
-
 export interface AuthError {
   statusCode: number;
   message: string;
   error?: string;
 }
-
-// ===== TIPOS DE TOKEN =====
 
 export interface JwtPayload {
   sub: string;
@@ -89,8 +75,6 @@ export interface JwtPayload {
   exp?: number;
 }
 
-// ===== TIPOS DE SESIÓN =====
-
 export interface SessionState {
   isAuthenticated: boolean;
   user: AuthUser | null;
@@ -100,8 +84,6 @@ export interface SessionState {
   lastActivity: number;
   isExpired: boolean;
 }
-
-// ===== TIPOS DE EVENTO =====
 
 export enum AuthEventType {
   LOGIN = 'auth:login',
@@ -118,36 +100,26 @@ export interface AuthEvent {
   data?: any;
 }
 
-// ===== TIPOS DE CONFIGURACIÓN =====
-
 export interface AuthConfig {
   apiBaseUrl: string;
   accessTokenKey: string;
   refreshTokenKey: string;
-  tokenExpirationWarning: number; // ms antes de expiración
-  sessionTimeoutWarning: number; // ms para advertencia
-  autoRefreshThreshold: number; // ms antes de expiración
-  tokenRefreshInterval: number; // ms entre chequeos
+  tokenExpirationWarning: number;
+  sessionTimeoutWarning: number;
+  autoRefreshThreshold: number;
+  tokenRefreshInterval: number;
 }
-
-// ===== CONSTANTS =====
 
 export const DEFAULT_AUTH_CONFIG: AuthConfig = {
   apiBaseUrl: process.env.REACT_APP_API_URL || 'http://localhost:3001/api/v1',
   accessTokenKey: 'auth:access_token',
   refreshTokenKey: 'auth:refresh_token',
-  tokenExpirationWarning: 60000, // 1 minuto antes
-  sessionTimeoutWarning: 300000, // 5 minutos antes
-  autoRefreshThreshold: 120000, // 2 minutos antes
-  tokenRefreshInterval: 30000, // Chequear cada 30 segundos
+  tokenExpirationWarning: 60000,
+  sessionTimeoutWarning: 300000,
+  autoRefreshThreshold: 120000,
+  tokenRefreshInterval: 30000,
 };
 
-// ===== FUNCIONES HELPER =====
-
-/**
- * Decodifica un JWT sin verificar la firma
- * (Usar solo en cliente, NUNCA confiar en esto en servidor)
- */
 export function decodeJwt(token: string): JwtPayload | null {
   try {
     const parts = token.split('.');
@@ -163,27 +135,18 @@ export function decodeJwt(token: string): JwtPayload | null {
   }
 }
 
-/**
- * Calcula cuándo expira un token basado en su payload
- */
 export function getTokenExpirationTime(token: string): number | null {
   const payload = decodeJwt(token);
   if (!payload || !payload.exp) return null;
-  return payload.exp * 1000; // Convertir a ms
+  return payload.exp * 1000;
 }
 
-/**
- * Verifica si un token está expirado
- */
 export function isTokenExpired(token: string, bufferMs: number = 0): boolean {
   const expirationTime = getTokenExpirationTime(token);
   if (!expirationTime) return true;
   return Date.now() >= expirationTime - bufferMs;
 }
 
-/**
- * Calcula cuántos ms faltan para que expiren
- */
 export function getTimeUntilExpiration(token: string): number {
   const expirationTime = getTokenExpirationTime(token);
   if (!expirationTime) return -1;

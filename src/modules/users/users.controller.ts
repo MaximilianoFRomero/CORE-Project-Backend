@@ -59,16 +59,13 @@ export class UsersController {
   ) {
     const currentUser = req.user;
     
-    // Prevenir creación de SUPER_ADMIN desde este endpoint
     if (createUserDto.role === UserRole.SUPER_ADMIN) {
       throw new ForbiddenException('Cannot create another Super Admin user');
     }
 
-    // Si generatePassword es true, generar contraseña automática
     let password = createUserDto.password;
     if (createUserDto.generatePassword && !password) {
       password = this.generateRandomPassword();
-    // Opcional: devolver la contraseña generada en la respuesta
     }
 
   const userToCreate = {

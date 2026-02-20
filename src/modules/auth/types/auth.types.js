@@ -70,4 +70,3 @@ exports.default = {
     isTokenExpired,
     getTimeUntilExpiration,
 };
-//# sourceMappingURL=auth.types.js.map
