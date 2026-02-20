@@ -1,8 +1,19 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  user: process.env.DB_USERNAME || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  database: process.env.DB_NAME || 'core_platform',
+});
+
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter } as any);
 
 async function resetAdminPassword() {
   console.log('🔄 Reseteando contraseña de admin...');
@@ -45,6 +56,7 @@ async function resetAdminPassword() {
     console.error('❌ Error:', error);
   } finally {
     await prisma.$disconnect();
+    await pool.end();
   }
 }
 
