@@ -1,28 +1,15 @@
-import { DataSource } from 'typeorm';
-import { User, UserRole, UserStatus } from '../src/modules/users/entities/user.entity';
+import 'dotenv/config';
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
+const prisma = new PrismaClient();
 
 async function initializeSuperAdmin() {
   console.log('🚀 Inicializando Super Administrador...');
 
-  const dataSource = new DataSource({
-    type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_NAME || 'core_platform',
-    entities: [User],
-    synchronize: false,
-  });
-
   try {
-    await dataSource.initialize();
-    console.log('✅ Conectado a la base de datos');
-
-    const userRepository = dataSource.getRepository(User);
-
-    const existingSuperAdmin = await userRepository.findOne({
-      where: { role: UserRole.SUPER_ADMIN }
+    const existingSuperAdmin = await prisma.user.findFirst({
+      where: { role: 'super_admin' },
     });
 
     if (existingSuperAdmin) {
@@ -30,12 +17,10 @@ async function initializeSuperAdmin() {
       console.log('   Email:', existingSuperAdmin.email);
       console.log('   Role:', existingSuperAdmin.role);
       console.log('   Status:', existingSuperAdmin.status);
-
-      const result = await dataSource.query(
-        'SELECT password FROM users WHERE id = $1',
-        [existingSuperAdmin.id]
+      console.log(
+        '   Password hash (first 30 chars):',
+        existingSuperAdmin.password?.substring(0, 30),
       );
-      console.log('   Password hash (first 30 chars):', result[0]?.password?.substring(0, 30));
       return;
     }
 
@@ -44,25 +29,24 @@ async function initializeSuperAdmin() {
       firstName: process.env.SUPER_ADMIN_FIRST_NAME || 'System',
       lastName: process.env.SUPER_ADMIN_LAST_NAME || 'Administrator',
       password: process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin123!',
-      role: UserRole.SUPER_ADMIN,
-      status: UserStatus.ACTIVE,
-      emailVerified: true,
     };
 
     console.log('📝 Configurando Super Admin:', superAdminConfig.email);
     console.log('📝 Password plaintext:', superAdminConfig.password);
 
-    const superAdmin = userRepository.create({
-      email: superAdminConfig.email,
-      firstName: superAdminConfig.firstName,
-      lastName: superAdminConfig.lastName,
-      password: superAdminConfig.password,
-      role: superAdminConfig.role,
-      status: superAdminConfig.status,
-      emailVerified: superAdminConfig.emailVerified,
-    });
+    const hashedPassword = await bcrypt.hash(superAdminConfig.password, 10);
 
-    await userRepository.save(superAdmin);
+    const superAdmin = await prisma.user.create({
+      data: {
+        email: superAdminConfig.email,
+        firstName: superAdminConfig.firstName,
+        lastName: superAdminConfig.lastName,
+        password: hashedPassword,
+        role: 'super_admin',
+        status: 'active',
+        emailVerified: true,
+      },
+    });
 
     console.log('🎉 Super Admin creado exitosamente!');
     console.log('📋 Credenciales:');
@@ -70,21 +54,18 @@ async function initializeSuperAdmin() {
     console.log('   Password (plaintext):', superAdminConfig.password);
     console.log('   Role:', superAdmin.role);
     console.log('   Status:', superAdmin.status);
-
-    const result = await dataSource.query(
-      'SELECT password FROM users WHERE id = $1',
-      [superAdmin.id]
+    console.log(
+      '   Password hash (first 30 chars):',
+      superAdmin.password?.substring(0, 30),
     );
-    console.log('   Password hash (first 30 chars):', result[0]?.password?.substring(0, 30));
 
     console.log('\n⚠️  GUARDA ESTAS CREDENCIALES EN UN LUGAR SEGURO ⚠️');
     console.log('   Cambia la contraseña en el primer inicio de sesión.');
-
   } catch (error) {
     console.error('❌ Error al crear Super Admin:', error);
     process.exit(1);
   } finally {
-    await dataSource.destroy();
+    await prisma.$disconnect();
   }
 }
 

@@ -236,3 +236,4 @@ data/
 
 # Trash
 .trash-*/
+/generated/prisma
