@@ -3,9 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { Deployment, DeploymentStatus } from './entities/deployment.entity';
+import { PrismaService } from '../../database/prisma/prisma.service';
+import {
+  Deployment,
+  DeploymentStatus,
+  DeploymentEnvironment,
+} from './entities/deployment.entity';
 import { CreateDeploymentDto } from './dto/create-deployment.dto';
 import { UpdateDeploymentDto } from './dto/update-deployment.dto';
 import { ProjectsService } from '../projects/projects.service';
@@ -13,27 +16,32 @@ import { ProjectsService } from '../projects/projects.service';
 @Injectable()
 export class DeploymentsService {
   constructor(
-    @InjectRepository(Deployment)
-    private deploymentsRepository: Repository<Deployment>,
+    private prisma: PrismaService,
     private projectsService: ProjectsService,
   ) {}
 
-async create(createDeploymentDto: CreateDeploymentDto): Promise<Deployment> {
-  const project = await this.projectsService.findOne(
-    createDeploymentDto.projectId,
-  );
+  async create(createDeploymentDto: CreateDeploymentDto): Promise<Deployment> {
+    const project = await this.projectsService.findOne(
+      createDeploymentDto.projectId,
+    );
 
-  const deployment = this.deploymentsRepository.create({
-    ...createDeploymentDto,
-    project,
-  });
+    const deployment = await this.prisma.deployment.create({
+      data: {
+        ...createDeploymentDto,
+        environment:
+          (createDeploymentDto.environment as DeploymentEnvironment) ||
+          DeploymentEnvironment.DEVELOPMENT,
+        status:
+          (createDeploymentDto.status as DeploymentStatus) ||
+          DeploymentStatus.PENDING,
+      },
+      include: { project: true },
+    });
 
-  const savedDeployment = await this.deploymentsRepository.save(deployment);
-  
-  await this.projectsService.updateLastDeployedAt(project.id);
-  
-  return savedDeployment;
-}
+    await this.projectsService.updateLastDeployedAt(project.id);
+
+    return this.mapToEntity(deployment);
+  }
 
   async findAll(
     projectId?: string,
@@ -45,7 +53,7 @@ async create(createDeploymentDto: CreateDeploymentDto): Promise<Deployment> {
     const where: any = {};
 
     if (projectId) {
-      where.project = { id: projectId };
+      where.projectId = projectId;
     }
 
     if (environment) {
@@ -57,75 +65,90 @@ async create(createDeploymentDto: CreateDeploymentDto): Promise<Deployment> {
     }
 
     if (startDate || endDate) {
-      where.createdAt = Between(startDate || new Date(0), endDate || new Date());
+      where.createdAt = {
+        gte: startDate || new Date(0),
+        lte: endDate || new Date(),
+      };
     }
 
-    return await this.deploymentsRepository.find({
+    const deployments = await this.prisma.deployment.findMany({
       where,
-      relations: ['project'],
-      order: { createdAt: 'DESC' },
+      orderBy: { createdAt: 'desc' },
+      include: { project: true },
     });
+
+    return deployments.map((d) => this.mapToEntity(d));
   }
 
   async findOne(id: string): Promise<Deployment> {
-    const deployment = await this.deploymentsRepository.findOne({
+    const deployment = await this.prisma.deployment.findUnique({
       where: { id },
-      relations: ['project'],
+      include: { project: true },
     });
 
     if (!deployment) {
       throw new NotFoundException(`Deployment with ID ${id} not found`);
     }
 
-    return deployment;
+    return this.mapToEntity(deployment);
   }
 
   async update(
     id: string,
     updateDeploymentDto: UpdateDeploymentDto,
   ): Promise<Deployment> {
-    const deployment = await this.findOne(id);
+    await this.findOne(id);
+
+    const updateData: any = { ...updateDeploymentDto };
 
     if (
       updateDeploymentDto.status === DeploymentStatus.SUCCESS ||
       updateDeploymentDto.status === DeploymentStatus.FAILED
     ) {
-      updateDeploymentDto['completedAt'] = new Date();
+      updateData.completedAt = new Date();
     }
 
     if (updateDeploymentDto.status === DeploymentStatus.RUNNING) {
-      updateDeploymentDto['startedAt'] = new Date();
+      updateData.startedAt = new Date();
     }
 
-    Object.assign(deployment, updateDeploymentDto);
-    deployment.updatedAt = new Date();
+    updateData.updatedAt = new Date();
 
-    return await this.deploymentsRepository.save(deployment);
+    const deployment = await this.prisma.deployment.update({
+      where: { id },
+      data: updateData,
+      include: { project: true },
+    });
+
+    return this.mapToEntity(deployment);
   }
 
   async remove(id: string): Promise<void> {
-    const deployment = await this.findOne(id);
-    await this.deploymentsRepository.remove(deployment);
+    await this.findOne(id);
+
+    await this.prisma.deployment.delete({
+      where: { id },
+    });
   }
 
   async getDeploymentStats(projectId?: string) {
     const where: any = {};
     if (projectId) {
-      where.project = { id: projectId };
+      where.projectId = projectId;
     }
 
     const [total, success, failed, running, pending] = await Promise.all([
-      this.deploymentsRepository.count({ where }),
-      this.deploymentsRepository.count({
+      this.prisma.deployment.count({ where }),
+      this.prisma.deployment.count({
         where: { ...where, status: DeploymentStatus.SUCCESS },
       }),
-      this.deploymentsRepository.count({
+      this.prisma.deployment.count({
         where: { ...where, status: DeploymentStatus.FAILED },
       }),
-      this.deploymentsRepository.count({
+      this.prisma.deployment.count({
         where: { ...where, status: DeploymentStatus.RUNNING },
       }),
-      this.deploymentsRepository.count({
+      this.prisma.deployment.count({
         where: { ...where, status: DeploymentStatus.PENDING },
       }),
     ]);
@@ -135,10 +158,13 @@ async create(createDeploymentDto: CreateDeploymentDto): Promise<Deployment> {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const todayDeployments = await this.deploymentsRepository.count({
+    const todayDeployments = await this.prisma.deployment.count({
       where: {
         ...where,
-        createdAt: Between(today, tomorrow),
+        createdAt: {
+          gte: today,
+          lt: tomorrow,
+        },
       },
     });
 
@@ -159,17 +185,41 @@ async create(createDeploymentDto: CreateDeploymentDto): Promise<Deployment> {
     projectId?: string,
   ) {
     const where: any = {
-      createdAt: Between(startDate, endDate),
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
     };
 
     if (projectId) {
-      where.project = { id: projectId };
+      where.projectId = projectId;
     }
 
-    return await this.deploymentsRepository.find({
+    const deployments = await this.prisma.deployment.findMany({
       where,
-      relations: ['project'],
-      order: { createdAt: 'ASC' },
+      orderBy: { createdAt: 'asc' },
+      include: { project: true },
     });
+
+    return deployments.map((d) => this.mapToEntity(d));
+  }
+
+  private mapToEntity(deployment: any): Deployment {
+    const entity = new Deployment();
+    entity.id = deployment.id;
+    entity.commitHash = deployment.commitHash;
+    entity.commitMessage = deployment.commitMessage;
+    entity.status = deployment.status as DeploymentStatus;
+    entity.environment = deployment.environment as DeploymentEnvironment;
+    entity.logs = deployment.logs;
+    entity.url = deployment.url;
+    entity.buildTime = deployment.buildTime;
+    entity.projectId = deployment.projectId;
+    entity.startedAt = deployment.startedAt;
+    entity.completedAt = deployment.completedAt;
+    entity.createdAt = deployment.createdAt;
+    entity.updatedAt = deployment.updatedAt;
+    entity.project = deployment.project;
+    return entity;
   }
 }

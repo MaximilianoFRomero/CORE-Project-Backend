@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum users_role_enum {
+  admin
+  super_admin
+  user
+  viewer
+}
+
+enum users_status_enum {
+  active
+  inactive
+  suspended
+  pending
+}
+
+enum projects_status_enum {
+  active
+  inactive
+  archived
+}
+
+enum projects_framework_enum {
+  nextjs
+  nestjs
+  express
+  react
+  vue
+  angular
+}
+
+enum deployments_status_enum {
+  pending
+  running
+  success
+  failed
+  cancelled
+}
+
+enum deployments_environment_enum {
+  development
+  staging
+  production
+}
+
+model User {
+  id            String            @id(map: "PK_a3ffb1c0c8416b9fc6f907b7433") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email         String            @unique(map: "UQ_97672ac88f789774dd47f7c8be3") @db.VarChar(255)
+  firstName     String            @map("firstName") @db.VarChar(100)
+  lastName      String            @map("lastName") @db.VarChar(100)
+  password      String            @db.VarChar(255)
+  role          users_role_enum   @default(user)
+  status        users_status_enum @default(pending)
+  avatarUrl     String?           @map("avatarUrl") @db.VarChar(500)
+  lastLoginAt   DateTime?         @map("lastLoginAt") @db.Timestamp(6)
+  githubId      String?           @unique(map: "UQ_42148de213279d66bf94b363bf2") @map("githubId") @db.VarChar(255)
+  googleId      String?           @unique(map: "UQ_f382af58ab36057334fb262efd5") @map("googleId") @db.VarChar(255)
+  emailVerified Boolean           @default(false) @map("emailVerified")
+  createdAt     DateTime          @default(now()) @map("createdAt") @db.Timestamp(6)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updatedAt") @db.Timestamp(6)
+
+  @@map("users")
+}
+
+model Project {
+  id             String                  @id(map: "PK_6271df0a7aed1d6c0691ce6ac50") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name           String                  @db.VarChar(255)
+  description    String?
+  repositoryUrl  String?                 @map("repositoryUrl") @db.VarChar(500)
+  status         projects_status_enum    @default(active)
+  framework      projects_framework_enum @default(nextjs)
+  databases      String                  @default("postgresql")
+  isPrivate      Boolean                 @default(false) @map("isPrivate")
+  createdAt      DateTime                @default(now()) @map("createdAt") @db.Timestamp(6)
+  updatedAt      DateTime                @default(now()) @updatedAt @map("updatedAt") @db.Timestamp(6)
+  lastDeployedAt DateTime?               @map("lastDeployedAt") @db.Timestamp(6)
+  deployments    Deployment[]
+
+  @@map("projects")
+}
+
+model Deployment {
+  id            String                       @id(map: "PK_1e5627acb3c950deb83fe98fc48") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  commitHash    String                       @map("commitHash") @db.VarChar(255)
+  commitMessage String                       @map("commitMessage") @db.VarChar(500)
+  status        deployments_status_enum      @default(pending)
+  environment   deployments_environment_enum @default(development)
+  logs          String?
+  url           String?                      @db.VarChar(500)
+  buildTime     Int?                         @map("buildTime")
+  projectId     String                       @map("projectId") @db.Uuid
+  createdAt     DateTime                     @default(now()) @map("createdAt") @db.Timestamp(6)
+  updatedAt     DateTime                     @default(now()) @updatedAt @map("updatedAt") @db.Timestamp(6)
+  startedAt     DateTime?                    @map("startedAt") @db.Timestamp(6)
+  completedAt   DateTime?                    @map("completedAt") @db.Timestamp(6)
+  project       Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("deployments")
+}
+
+model TokenBlacklist {
+  id        String   @id(map: "PK_3e37528d03f0bd5335874afa48d") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  token     String
+  expiresAt DateTime @map("expiresAt") @db.Timestamp(6)
+  createdAt DateTime @default(now()) @map("createdAt") @db.Timestamp(6)
+
+  @@index([token], map: "IDX_8c2ca80e62a4a178870aa9e7a0")
+  @@map("token_blacklist")
+}

@@ -9,6 +9,10 @@
     "init:superadmin": "ts-node scripts/init-super-admin.ts",
     "init:superadmin:prod": "node dist/scripts/init-super-admin.js",
     "reset-admin-password": "ts-node scripts/reset-admin-password.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:push": "prisma db push",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -20,7 +24,8 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.22",
     "@nestjs/swagger": "^7.4.2",
-    "@nestjs/typeorm": "^10.0.2",
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "@types/jest": "^30.0.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
@@ -28,11 +33,10 @@
     "dotenv": "^17.2.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "pg": "^8.17.2",
+    "pg": "^8.18.0",
     "reflect-metadata": "^0.1.14",
     "rxjs": "^7.8.2",
-    "supertest": "^7.2.2",
-    "typeorm": "^0.3.28"
+    "supertest": "^7.2.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",
@@ -40,6 +44,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.19.30",
     "@types/passport-jwt": "^4.0.1",
+    "prisma": "^7.4.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.2.2"

@@ -4,10 +4,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import { UsersService } from '../users/users.service';
-import { TokenBlacklist } from './entities/token-blacklist.entity';
 import { LoginUserDto } from '../users/dto/login-user.dto';
 import { User, UserStatus } from '../users/entities/user.entity';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -20,9 +18,8 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    @InjectRepository(TokenBlacklist)
-    private tokenBlacklistRepository: Repository<TokenBlacklist>,
-  ) { }
+    private prisma: PrismaService,
+  ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
     console.log('🔐 Validando usuario:', email);
@@ -33,7 +30,7 @@ export class AuthService {
       exists: !!user,
       email: user?.email,
       status: user?.status,
-      passwordLength: user?.password?.length
+      passwordLength: user?.password?.length,
     });
 
     if (!user) {
@@ -48,7 +45,10 @@ export class AuthService {
 
     console.log('🔐 Comparando contraseñas...');
     console.log('   Password ingresado:', password);
-    console.log('   Hash en DB (primeros 30):', user.password?.substring(0, 30));
+    console.log(
+      '   Hash en DB (primeros 30):',
+      user.password?.substring(0, 30),
+    );
 
     const isValidPassword = await bcrypt.compare(password, user.password);
 
@@ -66,7 +66,10 @@ export class AuthService {
   }
 
   async login(loginUserDto: LoginUserDto) {
-    const user = await this.validateUser(loginUserDto.email, loginUserDto.password);
+    const user = await this.validateUser(
+      loginUserDto.email,
+      loginUserDto.password,
+    );
 
     const payload = {
       sub: user.id,
@@ -77,12 +80,12 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '15m'
+      expiresIn: '15m',
     });
 
     const refreshTokenExpiresIn = loginUserDto.rememberMe ? '30d' : '7d';
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: refreshTokenExpiresIn
+      expiresIn: refreshTokenExpiresIn,
     });
 
     const accessExpiresIn = 900;
@@ -126,11 +129,11 @@ export class AuthService {
       };
 
       const newAccessToken = this.jwtService.sign(newPayload, {
-        expiresIn: '15m'
+        expiresIn: '15m',
       });
 
       const newRefreshToken = this.jwtService.sign(newPayload, {
-        expiresIn: '7d'
+        expiresIn: '7d',
       });
 
       return {
@@ -164,11 +167,9 @@ export class AuthService {
       status: UserStatus.PENDING,
     });
 
-    // Enviar email de verificación (implementar después)
-    // await this.emailService.sendVerificationEmail(user);
-
     return {
-      message: 'Registration successful. Please check your email to verify your account.',
+      message:
+        'Registration successful. Please check your email to verify your account.',
       userId: user.id,
     };
   }
@@ -181,12 +182,12 @@ export class AuthService {
 
       const payload = this.jwtService.verify(refreshToken);
 
-      const blacklistEntry = this.tokenBlacklistRepository.create({
-        token: refreshToken,
-        expiresAt: new Date(payload.exp * 1000),
+      await this.prisma.tokenBlacklist.create({
+        data: {
+          token: refreshToken,
+          expiresAt: new Date(payload.exp * 1000),
+        },
       });
-
-      await this.tokenBlacklistRepository.save(blacklistEntry);
 
       return { message: 'Logged out successfully' };
     } catch (error) {
@@ -195,10 +196,12 @@ export class AuthService {
   }
 
   async isTokenRevoked(token: string): Promise<boolean> {
-    const entry = await this.tokenBlacklistRepository.findOne({
+    const entry = await this.prisma.tokenBlacklist.findFirst({
       where: {
         token,
-        expiresAt: MoreThan(new Date())
+        expiresAt: {
+          gt: new Date(),
+        },
       },
     });
     return !!entry;
@@ -210,7 +213,8 @@ export class AuthService {
 
       if (!user) {
         return {
-          message: 'If an account with this email exists, you will receive a password reset link shortly.',
+          message:
+            'If an account with this email exists, you will receive a password reset link shortly.',
         };
       }
 
@@ -220,24 +224,19 @@ export class AuthService {
           email: user.email,
           type: 'password-reset',
         },
-        { expiresIn: '1h' }
+        { expiresIn: '1h' },
       );
-
-      // TODO: Guardar token en BD con expiration
-      // await this.passwordResetService.create(user.id, resetToken);
-
-      // TODO: Enviar email con link de reset
-      // const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
-      // await this.emailService.sendPasswordResetEmail(user.email, resetLink);
 
       console.log(`📧 Reset token para ${email}:`, resetToken);
 
       return {
-        message: 'If an account with this email exists, you will receive a password reset link shortly.',
+        message:
+          'If an account with this email exists, you will receive a password reset link shortly.',
       };
     } catch (error) {
       return {
-        message: 'If an account with this email exists, you will receive a password reset link shortly.',
+        message:
+          'If an account with this email exists, you will receive a password reset link shortly.',
       };
     }
   }
