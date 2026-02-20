@@ -50,7 +50,7 @@ enum deployments_environment_enum {
 }
 
 model User {
-  id            String            @id(map: "PK_a3ffb1c0c8416b9fc6f907b7433") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id            String            @id(map: "PK_a3ffb1c0c8416b9fc6f907b7433") @default(uuid()) @db.Uuid
   email         String            @unique(map: "UQ_97672ac88f789774dd47f7c8be3") @db.VarChar(255)
   firstName     String            @map("firstName") @db.VarChar(100)
   lastName      String            @map("lastName") @db.VarChar(100)
@@ -69,7 +69,7 @@ model User {
 }
 
 model Project {
-  id             String                  @id(map: "PK_6271df0a7aed1d6c0691ce6ac50") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id             String                  @id(map: "PK_6271df0a7aed1d6c0691ce6ac50") @default(uuid()) @db.Uuid
   name           String                  @db.VarChar(255)
   description    String?
   repositoryUrl  String?                 @map("repositoryUrl") @db.VarChar(500)
@@ -86,7 +86,7 @@ model Project {
 }
 
 model Deployment {
-  id            String                       @id(map: "PK_1e5627acb3c950deb83fe98fc48") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id            String                       @id(map: "PK_1e5627acb3c950deb83fe98fc48") @default(uuid()) @db.Uuid
   commitHash    String                       @map("commitHash") @db.VarChar(255)
   commitMessage String                       @map("commitMessage") @db.VarChar(500)
   status        deployments_status_enum      @default(pending)
@@ -106,7 +106,7 @@ model Deployment {
 }
 
 model TokenBlacklist {
-  id        String   @id(map: "PK_3e37528d03f0bd5335874afa48d") @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  id        String   @id(map: "PK_3e37528d03f0bd5335874afa48d") @default(uuid()) @db.Uuid
   token     String
   expiresAt DateTime @map("expiresAt") @db.Timestamp(6)
   createdAt DateTime @default(now()) @map("createdAt") @db.Timestamp(6)
