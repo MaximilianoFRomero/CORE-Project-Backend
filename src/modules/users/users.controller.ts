@@ -68,7 +68,7 @@ export class UsersController {
       password = this.generateRandomPassword();
     }
 
-  const userToCreate = {
+  const { generatePassword, ...userToCreate } = {
     ...createUserDto,
     password: password!,
   };
