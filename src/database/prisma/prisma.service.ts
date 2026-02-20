@@ -4,14 +4,12 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  private prisma: PrismaClient;
   private pool: Pool;
 
   constructor() {
-    const pool = new Pool({
+    this.pool = new Pool({
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432'),
       user: process.env.DB_USERNAME || 'postgres',
@@ -19,21 +17,33 @@ export class PrismaService
       database: process.env.DB_NAME || 'core_platform',
     });
 
-    const adapter = new PrismaPg(pool);
+    const adapter = new PrismaPg(this.pool);
     
-    super({
-      adapter,
-    });
-
-    this.pool = pool;
+    this.prisma = new PrismaClient({ adapter } as any);
   }
 
   async onModuleInit() {
-    await this.$connect();
+    await this.prisma.$connect();
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    await this.prisma.$disconnect();
     await this.pool.end();
+  }
+
+  get user() {
+    return this.prisma.user;
+  }
+
+  get project() {
+    return this.prisma.project;
+  }
+
+  get deployment() {
+    return this.prisma.deployment;
+  }
+
+  get tokenBlacklist() {
+    return this.prisma.tokenBlacklist;
   }
 }
