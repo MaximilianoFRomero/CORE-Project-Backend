@@ -13,7 +13,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   handleRequest(err: any, user: any, info: any) {
-    // Manejar diferentes tipos de errores JWT
     if (info instanceof TokenExpiredError) {
       throw new UnauthorizedException('Token has expired');
     }

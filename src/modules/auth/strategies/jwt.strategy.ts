@@ -23,7 +23,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: Request, payload: any) {
-    // 1. Verificar si el token ha sido revocado (blacklist)
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
     if (token) {
       const isBlacklisted = await this.authService.isTokenRevoked(token);
@@ -32,7 +31,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    // 2. Validar integridad del usuario en tiempo real
     const user = await this.usersService.findOne(payload.sub).catch(() => null);
 
     if (!user) {
@@ -49,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
-      sub: user.id, // Para compatibilidad con payloads previos
+      sub: user.id,
     };
   }
 }

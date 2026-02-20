@@ -26,11 +26,11 @@ export class CreateUserBySuperAdminDto {
 
   @IsOptional()
   @IsEnum(UserRole)
-  role?: UserRole = UserRole.USER; // Por defecto USER, pero super-admin puede elegir
+  role?: UserRole = UserRole.USER;
 
   @IsOptional()
   @IsEnum(UserStatus)
-  status?: UserStatus = UserStatus.ACTIVE; // Por defecto activo
+  status?: UserStatus = UserStatus.ACTIVE;
 
   @IsString()
   @MinLength(8)
